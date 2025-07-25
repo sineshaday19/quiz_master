@@ -64,6 +64,8 @@ const Register = () => {
     e.preventDefault();
     if (!allValid) return;
     setSuccess(true);
+    // Store registration info in localStorage for demo
+    localStorage.setItem('registeredRole', role);
     setEmail('');
     setPassword('');
     setConfirmPassword('');
@@ -77,6 +79,12 @@ const Register = () => {
       navigate('/login');
     }, 1800);
   };
+
+  // On mount, prefill role from localStorage if available
+  React.useEffect(() => {
+    const regRole = localStorage.getItem('registeredRole');
+    if (regRole) setRole(regRole);
+  }, []);
 
   return (
     <motion.div

@@ -35,11 +35,13 @@ const Login = () => {
   const location = useLocation();
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
+  const [role, setRole] = React.useState('Student');
   const [touched, setTouched] = React.useState({});
 
   React.useEffect(() => {
     setEmail('');
     setPassword('');
+    setRole('Student');
     setTouched({});
   }, [location.pathname]);
 
@@ -50,8 +52,12 @@ const Login = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!allValid) return;
-    login(email.trim(), password);
-    navigate('/dashboard');
+    login(email.trim(), password, role);
+    if (role === 'Instructor') {
+      navigate('/instructor-dashboard');
+    } else {
+      navigate('/dashboard');
+    }
   };
 
   return (
@@ -94,6 +100,10 @@ const Login = () => {
             style={inputStyle(touched.password ? validPassword : undefined)}
             aria-invalid={touched.password && !validPassword}
           />
+          <select style={inputStyle()} value={role} onChange={e => setRole(e.target.value)}>
+            <option>Student</option>
+            <option>Instructor</option>
+          </select>
           <button type="submit" style={{ ...buttonStyle, opacity: allValid ? 1 : 0.6, cursor: allValid ? 'pointer' : 'not-allowed' }} disabled={!allValid}>Login</button>
           <div style={{ textAlign: 'center', marginTop: 16 }}>
             <a href="/register" style={{ color: '#4f46e5', textDecoration: 'underline', fontWeight: 500 }}>Register</a>

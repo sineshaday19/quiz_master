@@ -78,10 +78,14 @@ const Contact = () => {
   const handleBlur = e => {
     setTouched({ ...touched, [e.target.name]: true });
   };
-  const handleSubmit = e => {
+  const handleSubmit = async e => {
     e.preventDefault();
     if (!allValid) return;
     setSending(true);
+    // Save message to localStorage
+    const messages = JSON.parse(localStorage.getItem('messages') || '[]');
+    messages.unshift({ name: form.name, email: form.email, message: form.message });
+    localStorage.setItem('messages', JSON.stringify(messages));
     setTimeout(() => {
       setSending(false);
       setSent(true);

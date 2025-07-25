@@ -105,7 +105,7 @@ const Header = () => {
                   flexDirection: 'column',
                   gap: 0
                 }}>
-                  <Link to="/quiz/results/1" style={dropdownLink}>Quiz Results</Link>
+                  <Link to="/quiz-results" style={dropdownLink}>Quiz Results</Link>
                   <Link to="/quiz/1/take" style={dropdownLink}>Quiz Take</Link>
                 </div>
               )}

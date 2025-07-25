@@ -1,22 +1,33 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../AuthContext';
-
-const quizzes = [
-  { title: 'Math Quiz', due: '2025-07-30', description: 'Algebra & Geometry', id: 1 },
-  { title: 'Science Quiz', due: '2025-08-02', description: 'Physics Basics', id: 2 },
-];
-const attempts = [
-  { quiz: 'Math Quiz', score: 85, date: '2025-07-20' },
-  { quiz: 'Science Quiz', score: 92, date: '2025-07-18' },
-];
-const achievements = [
-  { badge: 'Top Scorer', desc: 'Scored 90%+ in a quiz' },
-  { badge: 'Quiz Streak', desc: 'Completed 5 quizzes in a row' },
-];
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const [quizzes, setQuizzes] = useState([]);
+  const [progress, setProgress] = useState(0);
+  const [upcoming, setUpcoming] = useState([]);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    let quizzes = JSON.parse(localStorage.getItem('quizzes') || '[]');
+    const now = new Date();
+    // Remove expired quizzes
+    quizzes = quizzes.filter(q => !q.deadline || new Date(q.deadline) >= now);
+    localStorage.setItem('quizzes', JSON.stringify(quizzes));
+    setQuizzes(quizzes);
+    // Progress calculation
+    const attempts = JSON.parse(localStorage.getItem('quizAttempts') || '[]');
+    const attemptedQuizIds = new Set(attempts.map(a => a.quizId));
+    const completed = quizzes.filter((q, i) => attemptedQuizIds.has(i.toString())).length;
+    setProgress(quizzes.length ? Math.round((completed / quizzes.length) * 100) : 0);
+    // Upcoming deadlines (next 7 days)
+    const in7days = quizzes.filter(q => q.deadline && ((new Date(q.deadline) - now) / (1000*60*60*24) <= 7) && (new Date(q.deadline) - now) >= 0)
+      .sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+    setUpcoming(in7days);
+  }, []);
 
   return (
     <motion.div
@@ -46,34 +57,34 @@ const Dashboard = () => {
           {/* Available Quizzes */}
           <motion.div style={sectionCard} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
             <h2 style={sectionTitle}>Available Quizzes</h2>
-            {quizzes.map(q => (
-              <motion.div key={q.id} style={quizCard} whileHover={{ scale: 1.04, boxShadow: '0 4px 24px rgba(79,70,229,0.12)' }}>
+            {quizzes.length === 0 && <div style={{ color: '#888' }}>No quizzes available yet.</div>}
+            {quizzes.map((q, i) => (
+              <motion.div key={i} style={quizCard} whileHover={{ scale: 1.04, boxShadow: '0 4px 24px rgba(79,70,229,0.12)' }}>
                 <div style={{ fontWeight: 600, fontSize: '1.1rem' }}>{q.title}</div>
                 <div style={{ color: '#666', fontSize: '0.97rem' }}>{q.description}</div>
-                <div style={{ color: '#F59E0B', fontWeight: 500, marginTop: 4 }}>Due: {q.due}</div>
+                <div style={{ color: '#F59E0B', fontWeight: 500, marginTop: 4 }}>Deadline: {q.deadline ? new Date(q.deadline).toLocaleDateString() : 'N/A'}</div>
+                <div style={{ color: '#F59E0B', fontWeight: 500, marginTop: 4 }}>Category: {q.category || 'N/A'}</div>
+                <motion.button
+                  style={{
+                    marginTop: 12,
+                    background: '#4f46e5',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 8,
+                    padding: '10px 24px',
+                    fontWeight: 700,
+                    fontSize: '1rem',
+                    cursor: 'pointer',
+                    transition: 'background 0.2s',
+                    boxShadow: '0 2px 8px rgba(79,70,229,0.07)'
+                  }}
+                  whileHover={{ scale: 1.05, background: '#6366f1' }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => navigate(`/quiz/${i}/take`)}
+                >
+                  Take Quiz
+                </motion.button>
               </motion.div>
-            ))}
-          </motion.div>
-          {/* Recent Attempts */}
-          <motion.div style={sectionCard} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-            <h2 style={sectionTitle}>Recent Attempts</h2>
-            {attempts.map((a, i) => (
-              <div key={i} style={attemptRow}>
-                <span>{a.quiz}</span>
-                <span style={{ color: a.score >= 90 ? '#22c55e' : '#4f46e5', fontWeight: 600 }}>{a.score}%</span>
-                <span style={{ color: '#888' }}>{a.date}</span>
-              </div>
-            ))}
-          </motion.div>
-          {/* Achievements */}
-          <motion.div style={sectionCard} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-            <h2 style={sectionTitle}>Achievements</h2>
-            {achievements.map((ach, i) => (
-              <div key={i} style={badgeRow}>
-                <span style={badgeIcon}>🏅</span>
-                <span style={{ fontWeight: 600 }}>{ach.badge}</span>
-                <span style={{ color: '#888', fontSize: '0.97rem', marginLeft: 8 }}>{ach.desc}</span>
-              </div>
             ))}
           </motion.div>
         </motion.div>
@@ -83,8 +94,8 @@ const Dashboard = () => {
             <h2 style={sectionTitle}>Progress Tracking</h2>
             <div style={{ margin: '18px 0' }}>
               <div style={{ color: '#4f46e5', fontWeight: 600 }}>Completion Rate</div>
-              <div style={progressBarOuter}><div style={{ ...progressBarInner, width: '80%' }} /></div>
-              <div style={{ color: '#F59E0B', fontWeight: 600, marginTop: 8 }}>80% completed</div>
+              <div style={progressBarOuter}><div style={{ ...progressBarInner, width: `${progress}%` }} /></div>
+              <div style={{ color: '#F59E0B', fontWeight: 600, marginTop: 8 }}>{progress}% completed</div>
             </div>
             <div style={{ color: '#888', fontSize: '0.97rem' }}>Improvement trend: <span style={{ color: '#22c55e', fontWeight: 600 }}>+12%</span></div>
           </motion.div>
@@ -92,8 +103,13 @@ const Dashboard = () => {
             <h2 style={sectionTitle}>Upcoming Deadlines</h2>
             <div style={{ color: '#888', fontSize: '0.97rem', marginBottom: 8 }}>Next 7 days</div>
             <div style={calendarBox}>
-              <div style={calendarDay}><span>Jul 28</span><span style={{ color: '#4f46e5', fontWeight: 600 }}>Math Quiz</span></div>
-              <div style={calendarDay}><span>Aug 2</span><span style={{ color: '#4f46e5', fontWeight: 600 }}>Science Quiz</span></div>
+              {upcoming.length === 0 && <div style={{ color: '#aaa', fontSize: '1rem' }}>No upcoming deadlines.</div>}
+              {upcoming.map((q, i) => (
+                <div key={i} style={calendarDay}>
+                  <span>{new Date(q.deadline).toLocaleDateString()}</span>
+                  <span style={{ color: '#4f46e5', fontWeight: 600 }}>{q.title}</span>
+                </div>
+              ))}
             </div>
           </motion.div>
         </motion.div>

@@ -3,11 +3,12 @@ import React, { createContext, useContext, useState } from 'react';
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null); // { name: 'Sine Shaday' } or null
+  const [user, setUser] = useState(null); // { email, role, ... }
 
-  const login = (email, password) => {
-    console.log('AuthContext login called with:', email, password);
-    setUser({ email });
+  // Accept role as an argument for login
+  const login = (email, password, role = 'Student') => {
+    console.log('AuthContext login called with:', email, password, role);
+    setUser({ email, role });
   };
   const logout = () => setUser(null);
 
