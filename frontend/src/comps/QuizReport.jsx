@@ -1,83 +1,71 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  BarChart, 
-  Users, 
   BookOpen, 
-  Award, 
-  Filter,
-  Download,
-  ChevronDown,
-  ChevronUp,
-  User
+  BarChart2,
+  Download
 } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-const AdminReportsDashboard = () => {
+const AdminGradesView = () => {
   const [submissions, setSubmissions] = useState([]);
-  const [stats, setStats] = useState(null);
-  const [quizzes, setQuizzes] = useState([]);
-  const [allUsers, setAllUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [filters, setFilters] = useState({
-    quiz_id: '',
-    user_id: '',
-    status: ''
-  });
-  const [showFilters, setShowFilters] = useState(false);
+  const [stats, setStats] = useState(null);
 
-  // Get user data from localStorage
-  const user = JSON.parse(localStorage.getItem('user'));
-  
-  // Redirect non-admins
-  if (!user?.is_admin) {
-    window.location.href = '/';
-    return null;
-  }
-
-  // Fetch all data
+  // Fetch all submissions and statistics
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [quizzesRes, usersRes, submissionsRes, statsRes] = await Promise.all([
-          axios.get('http://localhost:5000/quizzes'),
-          axios.get('http://localhost:5000/users'), // Add this endpoint to your backend
-          axios.get('http://localhost:5000/admin/submissions', { 
-            params: {
-              ...filters,
-              // Always filter by current admin's user_id for their view
-              admin_id: user.user_id 
-            }
-          }),
-          axios.get('http://localhost:5000/admin/statistics', {
-            params: {
-              admin_id: user.user_id
-            }
-          })
-        ]);
+        setIsLoading(true);
         
-        setQuizzes(quizzesRes.data);
-        setAllUsers(usersRes.data);
+        // Fetch all submitted submissions
+        const submissionsRes = await axios.get('http://localhost:5000/submissions/admin/submissions', {
+          params: { status: 'submitted' }
+        });
         setSubmissions(submissionsRes.data);
+
+        // Fetch statistics
+        const statsRes = await axios.get('http://localhost:5000/submissions/admin/statistics');
         setStats(statsRes.data);
-        setIsLoading(false);
+
       } catch (error) {
-        toast.error('Failed to load reports');
+        console.error('Failed to fetch data:', error);
+        toast.error('Failed to load submissions');
+      } finally {
         setIsLoading(false);
       }
     };
-    fetchData();
-  }, [filters, user.user_id]);
 
-  const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-    setFilters(prev => ({ ...prev, [name]: value }));
-  };
+    fetchData();
+  }, []);
 
   const exportToCSV = () => {
-    toast.info('Exporting to CSV...');
-    // Actual CSV export implementation would go here
+    // Simple CSV export implementation
+    const headers = ['Quiz ID', 'Quiz Title', 'User ID', 'Username', 'Score', 'Total Points', 'Percentage', 'Submitted At'];
+    const csvRows = [
+      headers.join(','),
+      ...submissions.map(sub => 
+        [
+          sub.quiz_id,
+          `"${sub.quiz_title}"`,
+          sub.user_id,
+          `"${sub.username}"`,
+          sub.score,
+          sub.total_points,
+          Math.round((sub.score / sub.total_points) * 100),
+          new Date(sub.submitted_at).toLocaleString()
+        ].join(',')
+      )
+    ];
+    
+    const csvContent = csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'quiz_grades.csv';
+    link.click();
   };
 
   if (isLoading) {
@@ -89,179 +77,141 @@ const AdminReportsDashboard = () => {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800">Admin Performance Dashboard</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Logged in as: {user.first_name} {user.last_name} (Admin)
-          </p>
-        </div>
-        <div className="flex space-x-3">
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-          >
-            <Filter size={18} className="mr-2" />
-            Filters {showFilters ? <ChevronUp size={18} className="ml-1" /> : <ChevronDown size={18} className="ml-1" />}
-          </button>
-          <button
-            onClick={exportToCSV}
-            className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-          >
-            <Download size={18} className="mr-2" />
-            Export
-          </button>
-        </div>
+        <h1 className="text-2xl font-bold text-gray-800 flex items-center">
+          <BarChart2 className="mr-2" size={24} />
+          Quiz Results Dashboard
+        </h1>
+        <button 
+          onClick={exportToCSV}
+          className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+        >
+          <Download className="mr-2" size={18} />
+          Export to CSV
+        </button>
       </div>
 
-      {/* Filters */}
-      {showFilters && (
-        <div className="bg-white p-4 rounded-lg shadow-md mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Quiz</label>
-            <select
-              name="quiz_id"
-              value={filters.quiz_id}
-              onChange={handleFilterChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            >
-              <option value="">All Quizzes</option>
-              {quizzes.map(quiz => (
-                <option key={quiz.quiz_id} value={quiz.quiz_id}>
-                  {quiz.title} (ID: {quiz.quiz_id})
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Student</label>
-            <select
-              name="user_id"
-              value={filters.user_id}
-              onChange={handleFilterChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            >
-              <option value="">All Students</option>
-              {allUsers.filter(u => !u.is_admin).map(user => (
-                <option key={user.user_id} value={user.user_id}>
-                  {user.first_name} {user.last_name} (ID: {user.user_id})
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select
-              name="status"
-              value={filters.status}
-              onChange={handleFilterChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            >
-              <option value="">All</option>
-              <option value="submitted">Submitted</option>
-              <option value="in_progress">In Progress</option>
-            </select>
-          </div>
-        </div>
-      )}
-
-      {/* Statistics Cards */}
+      {/* Statistics Overview */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-xl shadow-md">
-            <div className="flex items-center">
-              <BookOpen className="h-8 w-8 text-blue-500" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Total Quizzes</p>
-                <p className="text-2xl font-bold">{stats.totalQuizzes}</p>
-              </div>
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white p-4 rounded-lg shadow">
+            <h3 className="text-sm font-medium text-gray-500">Total Quizzes</h3>
+            <p className="text-2xl font-bold">{stats.totalQuizzes || 0}</p>
           </div>
-          <div className="bg-white p-6 rounded-xl shadow-md">
-            <div className="flex items-center">
-              <Users className="h-8 w-8 text-green-500" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Total Submissions</p>
-                <p className="text-2xl font-bold">{stats.totalSubmissions}</p>
-              </div>
-            </div>
+          <div className="bg-white p-4 rounded-lg shadow">
+            <h3 className="text-sm font-medium text-gray-500">Total Submissions</h3>
+            <p className="text-2xl font-bold">{stats.totalSubmissions || 0}</p>
           </div>
-          <div className="bg-white p-6 rounded-xl shadow-md">
-            <div className="flex items-center">
-              <BarChart className="h-8 w-8 text-purple-500" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Avg. Score</p>
-                <p className="text-2xl font-bold">{Math.round(stats.averageScore || 0)}%</p>
-              </div>
-            </div>
+          <div className="bg-white p-4 rounded-lg shadow">
+            <h3 className="text-sm font-medium text-gray-500">Average Score</h3>
+            <p className="text-2xl font-bold">
+              {stats.averageScore ? Math.round(stats.averageScore) + '%' : 'N/A'}
+            </p>
           </div>
-          <div className="bg-white p-6 rounded-xl shadow-md">
-            <div className="flex items-center">
-              <Award className="h-8 w-8 text-yellow-500" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Pass Rate</p>
-                <p className="text-2xl font-bold">{Math.round(stats.passRate || 0)}%</p>
-              </div>
-            </div>
+          <div className="bg-white p-4 rounded-lg shadow">
+            <h3 className="text-sm font-medium text-gray-500">Pass Rate</h3>
+            <p className="text-2xl font-bold">
+              {stats.passRate ? Math.round(stats.passRate) + '%' : 'N/A'}
+            </p>
           </div>
         </div>
       )}
 
-      {/* Quiz Performance Table */}
-      <div className="bg-white rounded-xl shadow-md overflow-hidden">
+      {/* Submissions Table */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quiz</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Percentage</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted At</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {submissions.map((submission) => (
-                <tr key={submission.submission_id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <User className="h-5 w-5 text-gray-400 mr-2" />
-                      <div>
-                        <p className="font-medium text-gray-900">{submission.first_name} {submission.last_name}</p>
-                        <p className="text-sm text-gray-500">ID: {submission.user_id}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <p className="text-gray-900">{submission.quiz_title}</p>
-                    <p className="text-sm text-gray-500">ID: {submission.quiz_id}</p>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      (submission.score / submission.total_points) >= 0.7 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
-                      {submission.score}/{submission.total_points}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      submission.status === 'submitted' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {submission.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {submission.submitted_at ? new Date(submission.submitted_at).toLocaleString() : 'N/A'}
+              {submissions.length > 0 ? (
+                submissions.map((submission) => {
+                  const percentage = submission.total_points > 0 
+                    ? Math.round((submission.score / submission.total_points) * 100)
+                    : 0;
+                  const isPassing = percentage >= 70;
+
+                  return (
+                    <tr key={submission.submission_id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="font-medium text-gray-900">{submission.quiz_title}</div>
+                        <div className="text-sm text-gray-500">ID: {submission.quiz_id}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="font-medium text-gray-900">{submission.username}</div>
+                        <div className="text-sm text-gray-500">ID: {submission.user_id}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {submission.score} / {submission.total_points}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                          ${isPassing ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                          {percentage}%
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {new Date(submission.submitted_at).toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {isPassing ? (
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                            Passed
+                          </span>
+                        ) : (
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                            Failed
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
+                    No submissions found
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Quiz Performance Section */}
+      {stats?.quizzes?.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+            <BookOpen className="mr-2" size={20} />
+            Quiz Performance Overview
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {stats.quizzes.map(quiz => (
+              <div key={quiz.quiz_id} className="bg-white p-4 rounded-lg shadow">
+                <h3 className="font-medium text-gray-900">{quiz.title}</h3>
+                <div className="mt-2 space-y-1 text-sm">
+                  <div>Attempts: {quiz.attempts || 0}</div>
+                  <div>Average Score: {quiz.avgScore ? Math.round(quiz.avgScore) : 'N/A'}</div>
+                  <div>High Score: {quiz.highScore || 'N/A'}</div>
+                  <div>Low Score: {quiz.lowScore || 'N/A'}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-export default AdminReportsDashboard;
+export default AdminGradesView;

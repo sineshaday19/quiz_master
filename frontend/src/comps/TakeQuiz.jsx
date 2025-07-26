@@ -12,14 +12,17 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import StudentQuiz from './StudentManage';
+import StudentQuizResults from './StudentResults';
+
 
 
 export const TakeQuiz = () => {
     const [quizzes, setQuizzes] = useState([]);
     const [selectedQuizId, setSelectedQuizId] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [view, setView] = useState('quizzes'); // 'quizzes' or 'take-quiz'
+    const [view, setView] = useState('quizzes'); // 'quizzes', 'take-quiz', or 'view-results'
     const [submissionStatus, setSubmissionStatus] = useState({});
+    const [completedQuizData, setCompletedQuizData] = useState(null);
 
     // Get user info from localStorage
     const user = JSON.parse(localStorage.getItem('user'));
@@ -78,10 +81,96 @@ export const TakeQuiz = () => {
             fetchQuizzesAndSubmissions();
         }
     }, [view, currentUserId]);
-    console.log(quizzes)
+
     const handleBackFromQuiz = () => {
         setView('quizzes');
         setSelectedQuizId(null);
+        setCompletedQuizData(null);
+    };
+
+    const handleViewResults = async (quizId) => {
+        try {
+            setIsLoading(true);
+            setSelectedQuizId(quizId);
+            
+            // Fetch all the required data for the results view
+            const quizResponse = await axios.get(`http://localhost:5000/quizzes/${quizId}`);
+            const questionsResponse = await axios.get(`http://localhost:5000/questions/quiz/${quizId}`);
+            
+            // Get the submission data
+            const submissionResponse = await axios.get('http://localhost:5000/submissions', {
+                params: {
+                    quiz_id: quizId,
+                    user_id: currentUserId
+                }
+            });
+            
+            const submission = submissionResponse.data[0];
+            const answersResponse = await axios.get(`http://localhost:5000/submissions/${submission.submission_id}/answers`);
+            
+            // Format answers into the expected structure
+            const answers = {};
+            answersResponse.data.forEach(answer => {
+                answers[answer.question_id] = {
+                    answer_text: answer.answer_text,
+                    selected_option_id: answer.selected_option_id
+                };
+            });
+            
+            // Get options for multiple choice questions
+            const options = {};
+            for (const question of questionsResponse.data) {
+                if (question.question_type === 'multiple_choice') {
+                    const optionsResponse = await axios.get(`http://localhost:5000/questions/${question.question_id}/options`);
+                    options[question.question_id] = optionsResponse.data;
+                }
+            }
+            
+            // Calculate score
+            const score = {
+                obtained: submission.score,
+                total: submission.total_points,
+                percentage: submission.total_points > 0 
+                    ? Math.round((submission.score / submission.total_points) * 100) 
+                    : 0
+            };
+            
+            setCompletedQuizData({
+                quiz: quizResponse.data,
+                questions: questionsResponse.data,
+                answers,
+                options,
+                score
+            });
+            
+            setView('view-results');
+        } catch (error) {
+            console.error('Failed to load quiz results:', error);
+            toast.error('Failed to load quiz results');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const getQuizStatus = (quizId) => {
+        const status = submissionStatus[quizId]?.status;
+        const score = submissionStatus[quizId]?.score;
+        const total = submissionStatus[quizId]?.total_points;
+
+        if (!status) return null;
+
+        if (status === 'submitted') {
+            const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
+            return {
+                text: `Scored ${score}/${total} (${percentage}%)`,
+                color: percentage >= 70 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+            };
+        }
+
+        return {
+            text: 'In Progress',
+            color: 'bg-blue-100 text-blue-800'
+        };
     };
 
     if (isLoading) {
@@ -103,27 +192,18 @@ export const TakeQuiz = () => {
         );
     }
 
-    const getQuizStatus = (quizId) => {
-        const status = submissionStatus[quizId]?.status;
-        const score = submissionStatus[quizId]?.score;
-        const total = submissionStatus[quizId]?.total_points;
-
-        if (!status) return null;
-
-        if (status === 'submitted') {
-            const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
-            console.log(submissionStatus)
-            return {
-                text: `Scored ${score}/${total} (${percentage}%)`,
-                color: percentage >= 70 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-            };
-        }
-
-        return {
-            text: 'In Progress',
-            color: 'bg-blue-100 text-blue-800'
-        };
-    };
+    if (view === 'view-results' && completedQuizData) {
+        return (
+            <StudentQuizResults
+                quiz={completedQuizData.quiz}
+                questions={completedQuizData.questions}
+                answers={completedQuizData.answers}
+                options={completedQuizData.options}
+                score={completedQuizData.score}
+                onBack={handleBackFromQuiz}
+            />
+        );
+    }
 
     return (
         <div className="p-6 max-w-7xl mx-auto">
@@ -175,9 +255,12 @@ export const TakeQuiz = () => {
                                 <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
                                     <button
                                         onClick={() => {
-                                            !isCompleted ?
-                                                setSelectedQuizId(quiz.quiz_id) : null
-                                            setView('take-quiz');
+                                            if (isCompleted) {
+                                                handleViewResults(quiz.quiz_id);
+                                            } else {
+                                                setSelectedQuizId(quiz.quiz_id);
+                                                setView('take-quiz');
+                                            }
                                         }}
                                         className={`w-full px-4 py-2 rounded-lg transition-colors ${isCompleted
                                                 ? 'bg-green-600 hover:bg-green-700 text-white'

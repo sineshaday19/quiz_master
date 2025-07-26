@@ -420,6 +420,134 @@ submissionRouter.get("/", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch submissions" });
   }
 });
+submissionRouter.get("/results", async (req, res) => {
+  try {
+    const { quiz_id, user_id } = req.query;
 
+    if (!user_id) {
+      return res.status(400).json({ error: "user_id is required" });
+    }
 
+    // Convert user_id to number to ensure type matching with database
+    const userId = Number(user_id);
+
+   
+    let query = `
+      SELECT 
+        qs.submission_id,
+        qs.quiz_id,
+        qs.user_id,
+        qs.status,
+        qs.score,
+        qs.total_points,
+        qs.submitted_at,
+        q.title AS quiz_title,
+        q.description AS quiz_description
+      FROM quiz_submissions qs
+      JOIN quizzes q ON qs.quiz_id = q.quiz_id
+      WHERE qs.user_id = ?
+    `;
+
+    const params = [userId];
+
+    // Add quiz_id filter if provided
+    if (quiz_id) {
+      query += " AND qs.quiz_id = ?";
+      params.push(Number(quiz_id));
+    }
+
+    query += " ORDER BY qs.submitted_at DESC";
+
+    console.log("Executing query:", query, params); // Debug logging
+
+    const [submissions] = await db_con.query(query, params);
+
+    console.log("Query results:", submissions); // Debug logging
+
+    if (submissions.length === 0) {
+      return res.status(404).json({ error: "No submissions found for this user" });
+    }
+
+    // Rest of your code...
+  } catch (error) {
+    console.error("Error in /results endpoint:", error);
+    res.status(500).json({ error: "Failed to fetch student results" });
+  }
+});
+
+// Add this endpoint to your submissionRouter.js
+/**
+ * @swagger
+ * /submissions/{submission_id}/answers:
+ *   get:
+ *     summary: Get all answers for a submission
+ *     tags: [Submissions]
+ *     parameters:
+ *       - in: path
+ *         name: submission_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: List of submission answers
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   answer_id:
+ *                     type: integer
+ *                   submission_id:
+ *                     type: integer
+ *                   question_id:
+ *                     type: integer
+ *                   answer_text:
+ *                     type: string
+ *                   selected_option_id:
+ *                     type: integer
+ *                   points_earned:
+ *                     type: number
+ *       404:
+ *         description: Submission not found
+ *       500:
+ *         description: Failed to fetch answers
+ */
+submissionRouter.get("/:submission_id/answers", async (req, res) => {
+    try {
+        const { submission_id } = req.params;
+        
+        // First verify the submission exists
+        const [submission] = await db_con.query(
+            "SELECT * FROM quiz_submissions WHERE submission_id = ?",
+            [submission_id]
+        );
+        
+        if (submission.length === 0) {
+            return res.status(404).json({ error: "Submission not found" });
+        }
+        
+        // Get all answers for this submission
+        const [answers] = await db_con.query(
+            `SELECT 
+                sa.*,
+                q.question_text,
+                q.question_type,
+                qo.option_text AS selected_option_text
+             FROM submission_answers sa
+             LEFT JOIN questions q ON sa.question_id = q.question_id
+             LEFT JOIN question_options qo ON sa.selected_option_id = qo.option_id
+             WHERE sa.submission_id = ?
+             ORDER BY q.display_order`,
+            [submission_id]
+        );
+        
+        return res.status(200).json(answers);
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: "Failed to fetch submission answers" });
+    }
+});
 export default submissionRouter;

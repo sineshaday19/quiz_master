@@ -14,6 +14,7 @@ import UserManagement from './userManagement';
 import QuestionManagement from './QuizManage';
 import QuizReport from './QuizReport';
 import { TakeQuiz } from './TakeQuiz';
+import QuizResults from './StudentResults';
 
 const Dashboard = () => {
     const [user, setUser] = useState(null);
@@ -53,7 +54,7 @@ const Dashboard = () => {
     const userNavItems = [
         { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
         { id: 'quizzes', label: 'My Quizzes', icon: <ClipboardList size={20} /> },
-        { id: 'results', label: 'My Results', icon: <FileText size={20} /> },
+        // { id: 'results', label: 'My Results', icon: <FileText size={20} /> },
         // { id: 'settings', label: 'Settings', icon: <Settings size={20} /> }
     ];
 
@@ -85,6 +86,10 @@ const Dashboard = () => {
                 return (
                     <QuizReport />
                 );
+            case 'results':
+                return (
+                    <QuizResults />
+                )
             // Add more cases for other tabs
             default:
                 return (
