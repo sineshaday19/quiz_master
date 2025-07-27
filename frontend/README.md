@@ -43,4 +43,7 @@ npm run dev
 
 - Backend: Express, MYSQL, CORS
 - Frontend: React, Vite, Axios, Lucide React,Tailwind css
-```
+
+
+## Project Proposal:
+
