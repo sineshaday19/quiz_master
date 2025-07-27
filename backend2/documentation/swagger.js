@@ -29,7 +29,7 @@ const options = {
       bearerAuth: [],
     }],
   },
-  apis: ['../endpoints/*.js'], // Path to your route files
+  apis: ['../endpoints/*.js'], // Path to your route file
 };
 
 const specs = swaggerJsdoc(options);
