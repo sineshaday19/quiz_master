@@ -112,6 +112,7 @@ The objective of this project is to provide hands-on experience in developing a 
 - [Software Documentation (Google Doc)](https://docs.google.com/document/d/1wIH2Xp5GY-EyQpWoqxAUmTW-6OHu4D8mIMpMJsu93HE/edit?tab=t.0)
 - [Individual Contribution Report](./docs/Individual%20Contribution%20Report.docx)
 
+
 ## Instructions for Setting Up and Running
 
 1. Ensure MySQL is running and accessible.
